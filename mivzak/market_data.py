@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, time as datetime_time, timedelta
 from zoneinfo import ZoneInfo
 
-from .config import NEW_YORK_TZ
+from .config import ISRAEL_TZ, NEW_YORK_TZ
 from .http import HttpError, RETRY_STATUSES, Session
 
 YAHOO_LABEL = "Yahoo Finance"
@@ -637,9 +637,10 @@ def collect_market_data(trading_date: date, now: datetime | None = None, client:
 
     us_quote = snapshot.quotes.get("^GSPC")
     if us_quote and not us_quote.verified and us_quote.market_time:
-        ny_now = now.astimezone(NEW_YORK_TZ)
-        after_close = ny_now.date() > trading_date or (
-            ny_now.date() == trading_date and ny_now.time() >= datetime_time(16, 10)
+        # Wall Street closes at 23:00 Israel time.
+        israel_now = now.astimezone(ISRAEL_TZ)
+        after_close = israel_now.date() > trading_date or (
+            israel_now.date() == trading_date and israel_now.time() >= datetime_time(23, 10)
         )
         if trading_date.weekday() < 5 and us_quote.market_time.date() < trading_date and after_close:
             snapshot.us_market_closed = True

@@ -10,7 +10,7 @@ from datetime import date, datetime, time as datetime_time, timedelta
 from pathlib import Path
 
 from . import config
-from .config import CLOSING, ISRAEL_TZ, NEW_YORK_TZ, OPENING, OUTPUT_DIR, PAUSE
+from .config import CLOSING, ISRAEL_TZ, OPENING, OUTPUT_DIR, PAUSE
 from .market_data import collect_market_data, fixture_snapshot
 from .narration import build_data_paragraphs, order_paragraphs, when_phrase
 from .render import docx_filename, email_subject, render_docx, render_email
@@ -34,12 +34,21 @@ def parse_args(argv=None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+US_CLOSE_ISRAEL = datetime_time(23, 5)
+
+
 def resolve_trading_date(raw: str | None, now: datetime) -> date:
+    """The last completed US session, reckoned in Israel time only.
+
+    Wall Street closes at 23:00 Israel time, so a run from 23:05 onward
+    summarizes the same Israeli calendar date; earlier runs summarize the
+    previous weekday.
+    """
     if raw:
         return date.fromisoformat(raw)
-    new_york = now.astimezone(NEW_YORK_TZ)
-    trading_date = new_york.date()
-    if new_york.time() < datetime_time(16, 5):
+    israel = now.astimezone(ISRAEL_TZ)
+    trading_date = israel.date()
+    if israel.time() < US_CLOSE_ISRAEL:
         trading_date -= timedelta(days=1)
     while trading_date.weekday() >= 5:
         trading_date -= timedelta(days=1)
@@ -101,7 +110,10 @@ def run(args: argparse.Namespace) -> int:
     brief_date = trading_date + timedelta(days=1)
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    print(f"Role: {args.role} | trading date: {trading_date} | brief date: {brief_date} | recipient: {recipient}")
+    print(
+        f"Role: {args.role} | run time (Israel): {now.strftime('%Y-%m-%d %H:%M')} | "
+        f"trading date: {trading_date} | brief date: {brief_date} | recipient: {recipient}"
+    )
     set_github_output("trading_date", trading_date.isoformat())
     set_github_output("brief_date", brief_date.isoformat())
 
