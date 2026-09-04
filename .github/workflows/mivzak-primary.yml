@@ -1,0 +1,113 @@
+name: Mivzak IBI - primary
+
+# Builds the next-morning IBI brief for the trading day that just ended and
+# emails it (Word file attached) to the advisers' mailbox.
+# Runs Monday to Wednesday at 23:15 Israel time, fifteen minutes after the
+# US close.  A backup workflow re-runs at 23:35 and exits early when the
+# committed sent marker shows this run already delivered.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Build the brief and the Word file without sending email"
+        type: boolean
+        default: false
+      force_send:
+        description: "Send even if the sent marker says this trading day was delivered"
+        type: boolean
+        default: false
+      trading_date:
+        description: "Trading date to summarize (YYYY-MM-DD). Empty = last completed US session"
+        type: string
+        required: false
+      recipient:
+        description: "Recipient override for testing (empty = HELLYBRACHA@GMAIL.COM)"
+        type: string
+        required: false
+
+  schedule:
+    - cron: "15 23 * * 1-3"
+      timezone: "Asia/Jerusalem"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mivzak-delivery
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  deliver:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements.txt
+
+      - name: Self-test the generator
+        run: |
+          python -m compileall -q mivzak
+          python -m mivzak --self-test
+
+      - name: Build and deliver the brief
+        id: brief
+        env:
+          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          EXA_API_KEY: ${{ secrets.EXA_API_KEY }}
+          MIVZAK_RECIPIENT: ${{ inputs.recipient || 'HELLYBRACHA@GMAIL.COM' }}
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
+          INPUT_FORCE_SEND: ${{ inputs.force_send }}
+          INPUT_TRADING_DATE: ${{ inputs.trading_date }}
+        shell: bash
+        run: |
+          args=(--role primary)
+          if [[ "$INPUT_DRY_RUN" == "true" ]]; then
+            args+=(--dry-run)
+          fi
+          if [[ "$INPUT_FORCE_SEND" == "true" ]]; then
+            args+=(--force-send)
+          fi
+          if [[ -n "$INPUT_TRADING_DATE" ]]; then
+            args+=(--trading-date "$INPUT_TRADING_DATE")
+          fi
+          python -m mivzak "${args[@]}"
+
+      - name: Upload the generated brief
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mivzak-primary-${{ github.run_id }}
+          path: generated/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Record the sent marker
+        if: steps.brief.outputs.sent == 'true'
+        shell: bash
+        run: |
+          if git diff --quiet -- .github/state/mivzak-sent.json; then
+            echo "Sent marker did not change."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/state/mivzak-sent.json
+          git commit -m "Record delivered brief for trading day ${{ steps.brief.outputs.trading_date }}"
+          git pull --rebase origin "$GITHUB_REF_NAME"
+          git push origin "HEAD:$GITHUB_REF_NAME"
