@@ -12,7 +12,7 @@ from pathlib import Path
 from . import config
 from .config import CLOSING, ISRAEL_TZ, NEW_YORK_TZ, OPENING, OUTPUT_DIR, PAUSE
 from .market_data import collect_market_data, fixture_snapshot
-from .narration import build_data_paragraphs, order_paragraphs
+from .narration import build_data_paragraphs, order_paragraphs, when_phrase
 from .render import docx_filename, email_subject, render_docx, render_email
 from .sources import collect_sources, fixture_sources
 from .state import already_sent, load_state, write_state
@@ -63,7 +63,7 @@ def append_step_summary(markdown: str) -> None:
 def narration_lines(paragraphs: list) -> list:
     lines = [OPENING, ""]
     for paragraph in paragraphs:
-        lines.extend([paragraph.text, ""])
+        lines.extend(paragraph.lines + [""])
     lines.extend([PAUSE, "", CLOSING])
     return lines
 
@@ -73,17 +73,20 @@ def run_self_test() -> None:
     from .render import docx_body_text
 
     assert percent_phrase(0.5) == "במחצית האחוז"
-    assert percent_phrase(5.5) == "בכחמישה וחצי אחוזים"
+    assert percent_phrase(5.5) == "בחמישה וחצי אחוזים"
+    assert percent_phrase(7.2) == "בשבעה אחוזים ושתי עשיריות"
+    assert percent_phrase(1.2) == "באחוז ושתי עשיריות"
     trading_date = date(2026, 9, 3)
     snapshot = fixture_snapshot(trading_date)
     paragraphs = build_data_paragraphs(snapshot, trading_date)
-    assert len(paragraphs) >= 5, "fixture narration is too short"
+    assert len(paragraphs) >= 4, "fixture narration is too short"
     assert all("בב" not in paragraph.text for paragraph in paragraphs)
     output = Path(os.environ.get("RUNNER_TEMP", "/tmp")) / "mivzak-self-test.docx"
     render_docx([paragraph.text for paragraph in paragraphs], trading_date + timedelta(days=1), output)
     body = docx_body_text(output)
     assert body[-1] == PAUSE, "the pause line must close the body cell"
-    assert len(body) == len(paragraphs) + 1
+    expected_lines = [line for paragraph in paragraphs for line in paragraph.lines]
+    assert body[:-1] == expected_lines, "docx lines differ from the narration"
     from docx import Document
 
     text = " ".join(cell.text for row in Document(str(output)).tables[0].rows for cell in row.cells)
@@ -148,6 +151,7 @@ def run(args: argparse.Namespace) -> int:
             existing=paragraphs,
             leader_name=leader.name if leader else None,
             api_key=gemini_key,
+            when=when_phrase(trading_date),
         )
         notes.extend(llm_warnings)
         paragraphs = merge_paragraphs(paragraphs, news)
@@ -218,16 +222,26 @@ def run(args: argparse.Namespace) -> int:
 
 
 def merge_paragraphs(data_paragraphs: list, news_paragraphs: list) -> list:
-    """Attach the leader reason to the leader paragraph; keep the rest."""
+    """Attach the leader reason (and Hebrew name) to the leader line; keep the rest."""
     merged = list(data_paragraphs)
     for paragraph in news_paragraphs:
         if paragraph.category == "leader_reason":
             leader = next((item for item in merged if item.category == "leader"), None)
-            if leader is not None:
-                reason = paragraph.text.strip()
-                leader.text = leader.text.rstrip() + " " + reason
-                leader.sources.extend(paragraph.sources)
-                leader.source_ids.extend(paragraph.source_ids)
+            if leader is None:
+                continue
+            lines = leader.lines
+            if not lines:
+                continue
+            english_name = leader.data.get("leader_name")
+            hebrew_name = paragraph.data.get("hebrew_name")
+            if english_name and hebrew_name and f"מניית {english_name} " in lines[0]:
+                lines[0] = lines[0].replace(
+                    f"מניית {english_name} ", f"מניית {hebrew_name} ({english_name}) ", 1
+                )
+            lines[0] = lines[0].rstrip() + " " + " ".join(paragraph.lines)
+            leader.text = "\n".join(lines)
+            leader.sources.extend(paragraph.sources)
+            leader.source_ids.extend(paragraph.source_ids)
             continue
         merged.append(paragraph)
     return merged

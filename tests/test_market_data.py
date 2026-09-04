@@ -48,6 +48,7 @@ class HelperTests(unittest.TestCase):
         self.assertEqual(snapshot.leader.symbol, "SNOW")
         self.assertEqual(len(snapshot.sectors()), 11)
         self.assertEqual(len(snapshot.by_kind("us_index")), 3)
+        self.assertEqual(len(snapshot.by_kind("asia_index")), 3)
         self.assertIsNotNone(snapshot.quote("^TNX"))
 
 

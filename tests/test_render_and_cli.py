@@ -9,7 +9,7 @@ from mivzak import __main__ as cli
 from mivzak.config import CLOSING, ISRAEL_TZ, OPENING, PAUSE
 from mivzak.market_data import fixture_snapshot
 from mivzak.narration import Paragraph, build_data_paragraphs
-from mivzak.render import docx_body_text, render_docx, render_email, split_runs
+from mivzak.render import docx_body_text, docx_filename, email_subject, render_docx, render_email, split_runs
 from mivzak.state import already_sent, load_state, write_state
 
 
@@ -22,13 +22,15 @@ class RenderTests(unittest.TestCase):
              ("Aehr Test Systems", True), (" זינקה.", False)],
         )
 
-    def test_docx_and_email(self):
+    def test_docx_lines_and_email(self):
         trading_date = date(2026, 9, 3)
         paragraphs = build_data_paragraphs(fixture_snapshot(trading_date), trading_date)
+        expected_lines = [line for paragraph in paragraphs for line in paragraph.lines]
+        self.assertGreater(len(expected_lines), len(paragraphs))  # multi-line blocks exist
         with tempfile.TemporaryDirectory() as folder:
             path = render_docx([p.text for p in paragraphs], trading_date + timedelta(days=1), Path(folder) / "out.docx")
             body = docx_body_text(path)
-            self.assertEqual(body[:-1], [p.text for p in paragraphs])
+            self.assertEqual(body[:-1], expected_lines)
             self.assertEqual(body[-1], PAUSE)
             from docx import Document
 
@@ -44,6 +46,9 @@ class RenderTests(unittest.TestCase):
         self.assertIn(CLOSING, rich)
         self.assertIn("הערה", rich)
         self.assertIn("finance.yahoo.com", rich)
+        self.assertIn("<br>", rich)
+        self.assertEqual(docx_filename(date(2026, 9, 4)), "מבזק בוקר 04.09.2026.docx")
+        self.assertEqual(email_subject(date(2026, 9, 4)), "מבזק בוקר 04.09.2026")
 
 
 class StateTests(unittest.TestCase):
@@ -87,17 +92,30 @@ class CliTests(unittest.TestCase):
             files = sorted(path.name for path in Path(folder).iterdir())
             self.assertIn("narration.txt", files)
             self.assertIn("email.html", files)
-            self.assertTrue(any(name.endswith(".docx") for name in files))
+            self.assertIn("מבזק בוקר 04.09.2026.docx", files)
             self.assertIn("sent=false", outputs.read_text())
+            self.assertIn("trading_date=2026-09-03", outputs.read_text())
             self.assertIn(OPENING, summary.read_text(encoding="utf-8"))
 
-    def test_merge_leader_reason(self):
-        data = [Paragraph("leader", "מניית X זינקה."), Paragraph("us_close", "טקסט.")]
-        news = [Paragraph("leader_reason", "הזינוק הגיע על רקע חוזה חדש.", origin="llm", source_ids=[1]),
-                Paragraph("macro", "נתון.", origin="llm", source_ids=[1])]
+    def test_merge_leader_reason_with_hebrew_name(self):
+        data = [
+            Paragraph("leader", "מניית Intuitive Machines זינקה אמש בשבעה אחוזים ושתי עשיריות.\nמנגד, מניית X צנחה אמש בכעשרה אחוזים.",
+                      data={"leader_name": "Intuitive Machines"}),
+            Paragraph("us_close", "טקסט."),
+        ]
+        news = [
+            Paragraph("leader_reason", "זאת לאחר שהחברה הודיעה כי נבחרה לתוכנית לבניית תשתית תקשורת לוויינית.",
+                      origin="llm", source_ids=[1], data={"hebrew_name": "חברת תחום החלל אינטואיטיב מאשינס"}),
+            Paragraph("macro", "נתון.", origin="llm", source_ids=[1]),
+        ]
         merged = cli.merge_paragraphs(data, news)
         self.assertEqual(len(merged), 3)
-        self.assertIn("על רקע חוזה חדש", merged[0].text)
+        self.assertEqual(
+            merged[0].lines[0],
+            "מניית חברת תחום החלל אינטואיטיב מאשינס (Intuitive Machines) זינקה אמש בשבעה אחוזים ושתי עשיריות. "
+            "זאת לאחר שהחברה הודיעה כי נבחרה לתוכנית לבניית תשתית תקשורת לוויינית.",
+        )
+        self.assertEqual(merged[0].lines[1], "מנגד, מניית X צנחה אמש בכעשרה אחוזים.")
 
 
 if __name__ == "__main__":

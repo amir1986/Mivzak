@@ -140,7 +140,9 @@ def render_docx(paragraph_texts: list, brief_date: date, output_path: Path,
     for paragraph in list(body_cell.paragraphs):
         cell_element.remove(paragraph._p)
     for text in paragraph_texts:
-        _append_text_paragraph(cell_element, text_prototype, hebrew_rpr, latin_rpr, text)
+        lines = [line.strip() for line in str(text).split("\n") if line.strip()]
+        for line in lines:
+            _append_text_paragraph(cell_element, text_prototype, hebrew_rpr, latin_rpr, line)
         spacer = deepcopy(empty_prototype)
         _strip_paragraph_ids(spacer)
         cell_element.append(spacer)
@@ -179,11 +181,16 @@ def collect_sources(paragraphs: list) -> list:
 
 
 def email_subject(brief_date: date) -> str:
-    return "מבזק הידע של IBI על הבוקר – " + hebrew_full_date(brief_date)
+    return "מבזק בוקר " + brief_date.strftime("%d.%m.%Y")
 
 
 def docx_filename(brief_date: date) -> str:
-    return "מבזק IBI " + brief_date.strftime("%d.%m.%Y") + ".docx"
+    return "מבזק בוקר " + brief_date.strftime("%d.%m.%Y") + ".docx"
+
+
+def paragraph_lines(paragraph) -> list:
+    text = paragraph.text if hasattr(paragraph, "text") else str(paragraph)
+    return [line.strip() for line in text.split("\n") if line.strip()]
 
 
 def render_email(trading_date: date, brief_date: date, paragraphs: list, notes: list) -> tuple:
@@ -191,7 +198,7 @@ def render_email(trading_date: date, brief_date: date, paragraphs: list, notes: 
     sources = collect_sources(paragraphs)
     plain_lines = [OPENING, ""]
     for paragraph in paragraphs:
-        plain_lines.extend([paragraph.text, ""])
+        plain_lines.extend(paragraph_lines(paragraph) + [""])
     plain_lines.extend([PAUSE, "", CLOSING, ""])
     plain_lines.append("כל הנתונים במבזק מתייחסים ליום המסחר " + trading_date.strftime("%d.%m.%Y") + " בלבד.")
     if sources:
@@ -202,7 +209,9 @@ def render_email(trading_date: date, brief_date: date, paragraphs: list, notes: 
         plain_lines.extend(f"- {note}" for note in notes)
 
     rich_paragraphs = "".join(
-        '<p style="margin:0 0 16px 0;">' + html.escape(paragraph.text) + "</p>"
+        '<p style="margin:0 0 16px 0;">'
+        + "<br>".join(html.escape(line) for line in paragraph_lines(paragraph))
+        + "</p>"
         for paragraph in paragraphs
     )
     rich_sources = "".join(

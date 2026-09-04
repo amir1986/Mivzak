@@ -30,6 +30,9 @@ INSTRUMENTS = {
     "^GDAXI": ("מדד הדאקס בפרנקפורט", "europe_index"),
     "^FTSE": ("מדד הפוטסי בלונדון", "europe_index"),
     "^STOXX50E": ("מדד היורוסטוקס 50", "europe_index"),
+    "^N225": ("מדד הניקיי בטוקיו", "asia_index"),
+    "^HSI": ("מדד ההאנג סנג בהונג קונג", "asia_index"),
+    "000001.SS": ("מדד שנגחאי", "asia_index"),
     "CL=F": ("מחיר חבית נפט מסוג WTI", "oil"),
     "GC=F": ("מחיר אונקיית הזהב", "gold"),
     "^TNX": ('תשואת האג"ח של ממשלת ארה"ב לעשר שנים', "us_10y_yield"),
@@ -702,6 +705,9 @@ def fixture_snapshot(trading_date: date) -> MarketSnapshot:
 
     berlin = ZoneInfo("Europe/Berlin")
     london = ZoneInfo("Europe/London")
+    tokyo = ZoneInfo("Asia/Tokyo")
+    hong_kong = ZoneInfo("Asia/Hong_Kong")
+    shanghai = ZoneInfo("Asia/Shanghai")
     snapshot = MarketSnapshot(trading_date=trading_date, providers=[YAHOO_LABEL])
     snapshot.quotes = {
         "^GSPC": make("^GSPC", 7747.71, 7711.30),
@@ -710,6 +716,9 @@ def fixture_snapshot(trading_date: date) -> MarketSnapshot:
         "^GDAXI": make("^GDAXI", 26003.32, 26184.90, hour=17, tz=berlin),
         "^FTSE": make("^FTSE", 10831.52, 10874.00, hour=16, tz=london),
         "^STOXX50E": make("^STOXX50E", 6382.59, 6440.20, hour=17, tz=berlin),
+        "^N225": make("^N225", 45120.50, 45410.20, hour=15, tz=tokyo),
+        "^HSI": make("^HSI", 26210.10, 26355.80, hour=16, tz=hong_kong),
+        "000001.SS": make("000001.SS", 3880.40, 3892.10, hour=15, tz=shanghai),
         "CL=F": make("CL=F", 91.30, 90.58),
         "GC=F": make("GC=F", 4539.90, 4548.00),
         "^TNX": make("^TNX", 4.762, 4.790),

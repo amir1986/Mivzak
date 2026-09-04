@@ -115,41 +115,72 @@ def cardinal(n: int, gender: str = "m", noun_follows: bool = False) -> str:
     return _join(parts)
 
 
-def percent_phrase(pct: float, prefix: str = "ב") -> str | None:
-    """Template style: 0.5 -> "במחצית האחוז", 5.5 -> "בכחמישה וחצי אחוזים".
+def _tenth_suffix(tenth: int) -> str:
+    if tenth == 0:
+        return ""
+    if tenth == 1:
+        return " ועשירית"
+    if tenth == 2:
+        return " ושתי עשיריות"
+    if tenth == 5:
+        return " וחצי"
+    return f" ו{FEMININE_UNITS[tenth]} עשיריות"
 
-    Returns None for a move smaller than five hundredths of a percent, which
-    the narration treats as "no change".
+
+def percent_phrase(pct: float, prefix: str = "ב", approximate: bool = False) -> str | None:
+    """IBI style, precise to a tenth of a percent.
+
+    0.5 -> "במחצית האחוז", 1.2 -> "באחוז ושתי עשיריות", 7.2 -> "בשבעה אחוזים
+    ושתי עשיריות", 5.5 -> "בחמישה וחצי אחוזים".  Moves of ten percent and
+    more are rounded to whole percents with the Hebrew "about" (כ), which
+    ``approximate`` also forces for smaller values.  Returns None for a move
+    smaller than five hundredths of a percent ("no change").
     """
     magnitude = abs(float(pct))
     tenths = round_half_up(magnitude * 10)
     if tenths == 0:
         return None
+    whole, tenth = divmod(tenths, 10)
 
-    if tenths < 10:
-        if tenths == 1:
+    if whole >= 10:
+        core = f"{cardinal(round_half_up(magnitude), 'm', noun_follows=True)} אחוזים"
+        approximate = True
+    elif whole == 0:
+        if tenth == 1:
             core = "עשירית האחוז"
-        elif tenths == 2:
+        elif tenth == 2:
             core = "שתי עשיריות האחוז"
-        elif tenths == 5:
+        elif tenth == 5:
             core = "מחצית האחוז"
         else:
-            core = f"{FEMININE_UNITS[tenths]} עשיריות האחוז"
-        return prefix + core
-
-    if magnitude < 9.75:
-        halves = round_half_up(magnitude * 2)
-        whole, half = divmod(halves, 2)
-        if whole == 1:
-            core = "כאחוז וחצי" if half else "כאחוז"
-        elif half:
-            core = f"כ{MASCULINE_UNITS[whole]} וחצי אחוזים"
-        else:
-            core = f"כ{cardinal(whole, 'm', noun_follows=True)} אחוזים"
+            core = f"{FEMININE_UNITS[tenth]} עשיריות האחוז"
+    elif whole == 1:
+        core = "אחוז" + _tenth_suffix(tenth)
+    elif tenth == 5:
+        core = f"{MASCULINE_UNITS[whole]} וחצי אחוזים"
     else:
-        whole = round_half_up(magnitude)
-        core = f"כ{cardinal(whole, 'm', noun_follows=True)} אחוזים"
+        core = f"{cardinal(whole, 'm', noun_follows=True)} אחוזים" + _tenth_suffix(tenth)
+
+    if approximate:
+        core = "כ" + core
     return prefix + core
+
+
+def decimal_points_phrase(value: float) -> str:
+    """Index levels read aloud: 20.6 -> "עשרים נקודה שש נקודות"."""
+    value = float(value)
+    negative = value < 0
+    magnitude = abs(value)
+    whole = int(magnitude)
+    tenth = round_half_up((magnitude - whole) * 10)
+    if tenth >= 10:
+        whole += 1
+        tenth -= 10
+    if tenth == 0:
+        words = count_phrase(whole, "נקודה", "נקודות", "f")
+    else:
+        words = f"{cardinal(whole, 'f')} נקודה {FEMININE_UNITS[tenth]} נקודות"
+    return ("מינוס " + words) if negative else words
 
 
 def basis_points_phrase(basis_points: float) -> str | None:
@@ -288,11 +319,9 @@ def _replace_percent(match: re.Match) -> str:
     head = prefix[:-1] if approximate else prefix
     if head in {"ל", "מ"}:
         return head + ("כ" if approximate else "") + yield_phrase(value)
-    phrase = percent_phrase(value, "")
+    phrase = percent_phrase(value, "", approximate=approximate)
     if phrase is None:
         return match.group(0)
-    if approximate and not phrase.startswith("כ"):
-        phrase = "כ" + phrase
     return head + phrase
 
 
@@ -324,8 +353,12 @@ def _replace_money(match: re.Match) -> str:
 
 
 def _replace_points(match: re.Match) -> str:
-    value = round_half_up(_parse_number(match.group("num")))
-    return (match.group("prefix") or "") + count_phrase(value, "נקודה", "נקודות", "f")
+    raw = match.group("num")
+    if "." in raw:
+        words = decimal_points_phrase(_parse_number(raw))
+    else:
+        words = count_phrase(round_half_up(_parse_number(raw)), "נקודה", "נקודות", "f")
+    return (match.group("prefix") or "") + words
 
 
 def _replace_years(match: re.Match) -> str:
