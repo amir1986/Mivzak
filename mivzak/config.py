@@ -13,7 +13,12 @@ DEFAULT_RECIPIENT = "hellybracha@gmail.com"
 
 ROOT = Path(__file__).resolve().parent.parent
 TEMPLATE_PATH = ROOT / "templates" / "mivzak_template.docx"
-STATE_PATH = ROOT / ".github" / "state" / "mivzak-sent.json"
+# The sent marker normally lives next to the code; a host repository that
+# embeds this folder can point it elsewhere with MIVZAK_STATE_PATH.
+STATE_PATH = Path(
+    os.environ.get("MIVZAK_STATE_PATH", "").strip()
+    or ROOT / ".github" / "state" / "mivzak-sent.json"
+)
 OUTPUT_DIR = ROOT / "generated"
 
 # The three fixed sentences of the template.  They are never regenerated.
