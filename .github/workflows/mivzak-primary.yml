@@ -7,6 +7,15 @@ name: Mivzak IBI - primary
 # committed sent marker shows this run already delivered.
 
 on:
+  # Precise trigger: a small commit that appends a line to the trigger log
+  # starts the run at once.  GitHub's own cron below is kept as a fallback
+  # because scheduled runs on this account start two to five hours late; the
+  # committed sent marker makes the late run a no-op when the brief already
+  # went out.
+  push:
+    paths:
+      - ".github/state/mivzak-trigger.log"
+
   workflow_dispatch:
     inputs:
       dry_run:
@@ -40,6 +49,7 @@ concurrency:
 
 jobs:
   deliver:
+    if: github.event_name != 'push' || contains(github.event.head_commit.message, '[mivzak-brief-run]')
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
