@@ -35,11 +35,12 @@
 
 1. **טריגר מדויק:** ב-23:15 שעון ישראל, בימים ב׳–ד׳, Routine של Claude
    ("Mivzak brief trigger 23:15", שני רשומות: שעון קיץ ושעון חורף, כי ה-cron
-   של Routines הוא ב-UTC) מעיר סשן ייעודי ("Mivzak brief trigger session")
-   שדוחף commit קטן שמוסיף שורה ל-`.github/state/mivzak-trigger.log`
+   של Routines הוא ב-UTC) מעיר את הסשן של Claude שבנה את המערכת ("דוחות שוק יומיים"),
+   והסשן דוחף commit קטן שמוסיף שורה ל-`.github/state/mivzak-trigger.log`
    עם ההודעה `Run Mivzak brief [mivzak-brief-run]`. ה-push מפעיל את
    `mivzak-primary.yml` מיד (טריגר `push` מתחיל תוך שניות, בניגוד ל-cron).
-   ה-Routines מופיעים ב-claude.ai תחת Routines ואפשר להשהות אותם משם.
+   ה-Routines מופיעים ב-claude.ai תחת Routines ואפשר להשהות אותם משם. אם הסשן
+   הזה יועבר לארכיון, הטריגר המדויק יפסיק והמבזק יישלח באיחור דרך ה-cron.
 2. **גיבוי:** ה-cron של primary (23:15) ו-backup (23:35) נשאר. הוא רץ באיחור,
    אבל סמן השליחה גורם לו לצאת מיד כשהמבזק כבר נשלח, כך שאין כפילות.
 
