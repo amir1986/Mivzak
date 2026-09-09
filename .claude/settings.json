@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bash /home/user/Mivzak/tools/push_mail_action_trigger.sh)",
+      "Bash(bash /home/user/Mivzak/tools/push_mail_action_trigger.sh:*)",
+      "Bash(bash tools/push_mail_action_trigger.sh)",
+      "Bash(bash tools/push_mail_action_trigger.sh:*)",
+      "Bash(TZ=Asia/Jerusalem date:*)",
+      "Bash(git -C /home/user/mail-action- fetch:*)",
+      "Bash(git -C /home/user/mail-action- checkout:*)",
+      "Bash(git -C /home/user/mail-action- add:*)",
+      "Bash(git -C /home/user/mail-action- commit:*)",
+      "Bash(git -C /home/user/mail-action- push origin main)",
+      "Bash(git -C /home/user/mail-action- pull --rebase origin main)",
+      "Bash(git -C /home/user/mail-action- log:*)",
+      "Bash(git -C /home/user/mail-action- status:*)",
+      "Bash(git -C /home/user/mail-action- rev-parse:*)"
+    ]
+  }
+}
