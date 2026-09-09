@@ -27,6 +27,34 @@
 
 > workflows מתוזמנים רצים רק מה-branch הראשי (default branch) של הריפו.
 
+## תזמון מדויק ב-23:15 (ולמה ה-cron לבדו לא מספיק)
+
+ה-scheduler של GitHub Actions מפעיל ריצות מתוזמנות בחשבון הזה באיחור של
+שעתיים עד חמש שעות (נמדד בכל ה-workflows כאן, בלי קשר לאזור הזמן), ולכן
+המבזק יצא בסביבות 01:45 במקום 23:15. הפתרון עובד בשתי שכבות:
+
+1. **טריגר מדויק:** ב-23:15 שעון ישראל, בימים ב׳–ד׳, Routine של Claude
+   ("Mivzak brief trigger 23:15", שני רשומות: שעון קיץ ושעון חורף, כי ה-cron
+   של Routines הוא ב-UTC) מעיר סשן ייעודי ("Mivzak brief trigger session")
+   שדוחף commit קטן שמוסיף שורה ל-`.github/state/mivzak-trigger.log`
+   עם ההודעה `Run Mivzak brief [mivzak-brief-run]`. ה-push מפעיל את
+   `mivzak-primary.yml` מיד (טריגר `push` מתחיל תוך שניות, בניגוד ל-cron).
+   ה-Routines מופיעים ב-claude.ai תחת Routines ואפשר להשהות אותם משם.
+2. **גיבוי:** ה-cron של primary (23:15) ו-backup (23:35) נשאר. הוא רץ באיחור,
+   אבל סמן השליחה גורם לו לצאת מיד כשהמבזק כבר נשלח, כך שאין כפילות.
+
+הרצה ידנית של הטריגר: כל commit ל-main שמשנה את קובץ הטריגר ומכיל
+`[mivzak-brief-run]` בהודעה מפעיל את ה-workflow; אפשר גם Run workflow רגיל.
+
+חלופה חזקה עוד יותר, אם תרצה להיפטר מהתלות ב-Routine: שירות cron חיצוני
+(למשל cron-job.org) שקורא ב-23:15 שעון ישראל ל-API של GitHub
+(`POST /repos/amir1986/Mivzak/actions/workflows/mivzak-primary.yml/dispatches`
+עם `{"ref":"main"}`) באמצעות fine-grained token עם הרשאת Actions: write.
+
+> בריפו הזה הטריגר המדויק מוגדר באותו אופן (קובץ `.github/state/mivzak-trigger.log`
+> והסימון `[mivzak-brief-run]`), אבל ה-Routine שדוחף את ה-commit ב-23:15 מכוון
+> כרגע רק לעותק הפעיל ב-mail-action.
+
 ## מה נכנס למבזק
 
 המשפטים הקבועים של התבנית נשמרים כמו שהם (פתיחה, "שניה הפסקה" מודגש בירוק,
