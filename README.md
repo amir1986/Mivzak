@@ -34,13 +34,17 @@
 המבזק יצא בסביבות 01:45 במקום 23:15. הפתרון עובד בשתי שכבות:
 
 1. **טריגר מדויק:** ב-23:15 שעון ישראל, בימים ב׳–ד׳, Routine של Claude
-   ("Mivzak brief trigger 23:15", שני רשומות: שעון קיץ ושעון חורף, כי ה-cron
-   של Routines הוא ב-UTC) מעיר את הסשן של Claude שבנה את המערכת ("דוחות שוק יומיים"),
-   והסשן דוחף commit קטן שמוסיף שורה ל-`.github/state/mivzak-trigger.log`
-   עם ההודעה `Run Mivzak brief [mivzak-brief-run]`. ה-push מפעיל את
-   `mivzak-primary.yml` מיד (טריגר `push` מתחיל תוך שניות, בניגוד ל-cron).
-   ה-Routines מופיעים ב-claude.ai תחת Routines ואפשר להשהות אותם משם. אם הסשן
-   הזה יועבר לארכיון, הטריגר המדויק יפסיק והמבזק יישלח באיחור דרך ה-cron.
+   ("Mivzak brief trigger 23:15", שתי רשומות: שעון קיץ ושעון חורף, כי ה-cron
+   של Routines הוא ב-UTC) מעיר את הסשן של Claude שבנה את המערכת ("דוחות שוק
+   יומיים"). הסשן מריץ את `tools/push_mail_action_trigger.sh`, שדוחף
+   ל-mail-action commit קטן המוסיף שורה ל-`.github/state/mivzak-brief-trigger.log`
+   עם ההודעה `Run Mivzak brief [mivzak-brief-run]`. ה-push מפעיל את ה-workflow
+   מיד (טריגר `push` מתחיל תוך שניות ספורות, בניגוד ל-cron). מחוץ לחלון
+   ב׳–ד׳ 23:05–23:55 שעון ישראל הסקריפט לא עושה דבר, ולכן שתי הרשומות
+   (קיץ/חורף) יכולות להישאר פעילות במקביל; `--force` מדלג על הבדיקה הזו
+   לבדיקות ידניות. ה-Routines מופיעים ב-claude.ai תחת Routines ואפשר להשהות
+   אותם משם. אם הסשן הזה יועבר לארכיון, הטריגר המדויק יפסיק והמבזק יישלח
+   באיחור דרך ה-cron.
 2. **גיבוי:** ה-cron של primary (23:15) ו-backup (23:35) נשאר. הוא רץ באיחור,
    אבל סמן השליחה גורם לו לצאת מיד כשהמבזק כבר נשלח, כך שאין כפילות.
 
@@ -53,8 +57,11 @@
 עם `{"ref":"main"}`) באמצעות fine-grained token עם הרשאת Actions: write.
 
 > בריפו הזה הטריגר המדויק מוגדר באותו אופן (קובץ `.github/state/mivzak-trigger.log`
-> והסימון `[mivzak-brief-run]`), אבל ה-Routine שדוחף את ה-commit ב-23:15 מכוון
-> כרגע רק לעותק הפעיל ב-mail-action.
+> והסימון `[mivzak-brief-run]`), אבל הסקריפט וה-Routine שדוחפים את ה-commit
+> ב-23:15 מכוונים כרגע רק לעותק הפעיל ב-mail-action, כי רק שם מוגדרים
+> ה-Secrets. כדי להפעיל טריגר מדויק גם כאן: להגדיר Secrets בריפו הזה ולהריץ
+> עותק של הסקריפט עם `REPO_URL` ו-`TRIGGER_FILE` של הריפו הזה (שני המשתנים
+> בראש הקובץ).
 
 ## מה נכנס למבזק
 
@@ -153,8 +160,11 @@ mivzak/
   state.py         סמן השליחה המשותף ל-primary ול-backup
 templates/mivzak_template.docx   התבנית המקורית של IBI
 tests/                           בדיקות יחידה
+tools/push_mail_action_trigger.sh  הטריגר המדויק של 23:15 (מורץ על ידי ה-Routine)
+.claude/settings.json            אישור מראש לסקריפט הטריגר בסשן של Claude
 .github/workflows/               primary, backup ו-CI
 .github/state/mivzak-sent.json   סמן השליחה (מתעדכן אוטומטית)
+.github/state/mivzak-trigger.log קובץ הטריגר (commit אליו עם [mivzak-brief-run] מפעיל ריצה)
 ```
 
 ## הערות תפעול
